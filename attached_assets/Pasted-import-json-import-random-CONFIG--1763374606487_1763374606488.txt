@@ -1,0 +1,201 @@
+import json
+import random
+
+# ==========================
+# CONFIG
+# ==========================
+
+# Tail size: 2–10 → snake length 3–11 (head + tails)
+MIN_SNAKE_LEN = 3      # minimum tiles in one snake
+MAX_SNAKE_LEN = 11     # maximum tiles in one snake
+
+# How many times to retry full filling before giving up
+MAX_GLOBAL_ATTEMPTS = 1000
+
+# Set to an integer for reproducible generation, or None for random each run
+RANDOM_SEED = None
+
+# ==========================
+# SHAPE INPUT
+# ==========================
+# Use '#' for shape cells, ' ' (space) for empty.
+# You can replace this with ANY shape of your choice.
+#
+# Example (your heart):
+ASCII_SHAPE = """
+   ######  ######
+ ######## ######## 
+ ###################
+  #################
+    #############
+      #########
+        #######
+          ###
+           #
+""".strip("\n")
+
+
+# ==========================
+# CORE LOGIC
+# ==========================
+
+def parse_shape(ascii_mask: str):
+    """
+    Parse ASCII shape into:
+      - tiles: set of (x, y) positions where there is a '#'
+      - width, height: dimensions of the grid
+    """
+    tiles = set()
+    rows = ascii_mask.splitlines()
+    height = len(rows)
+    width = max(len(r) for r in rows)
+
+    for y, row in enumerate(rows):
+        row = row.ljust(width, " ")  # pad with spaces
+        for x, ch in enumerate(row):
+            if ch == "#":
+                tiles.add((x, y))
+
+    return tiles, width, height
+
+
+def neighbors(p, tiles):
+    """Return 4-directional neighbors of p that are inside tiles."""
+    x, y = p
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        np = (x + dx, y + dy)
+        if np in tiles:
+            yield np
+
+
+def build_snake(start, tiles, used_global, min_len, max_len):
+    """
+    Try to build a single snake starting from `start`.
+    - tiles: all shape cells
+    - used_global: cells already used by other snakes
+    Returns a list of positions [(x,y), ...] or None.
+    """
+    path = [start]
+    used_local = {start}
+
+    for _ in range(max_len - 1):
+        x, y = path[-1]
+
+        # candidate neighbors: in shape, not used globally, not used in this snake
+        cand = [n for n in neighbors((x, y), tiles)
+                if n not in used_global and n not in used_local]
+
+        if not cand:
+            break
+
+        random.shuffle(cand)
+        chosen = cand[0]
+
+        path.append(chosen)
+        used_local.add(chosen)
+
+        if len(path) >= max_len:
+            break
+
+    if len(path) >= min_len:
+        return path
+    return None
+
+
+def try_fill_once(tiles, min_len, max_len):
+    """
+    Attempt to cover all tiles with non-overlapping snakes in one pass.
+    Returns list of snakes (each is list[(x, y)]) or None if failed.
+    """
+    unused = set(tiles)
+    used_global = set()
+    snakes = []
+
+    while unused:
+        # Pick a random unused cell to start a new snake
+        start = random.choice(list(unused))
+
+        snake = build_snake(start, tiles, used_global, min_len, max_len)
+        if snake is None:
+            # could not grow a valid snake from this starting layout
+            return None
+
+        # Reserve its cells globally
+        for p in snake:
+            if p in used_global:
+                # Overlap case → invalid
+                return None
+            used_global.add(p)
+            if p in unused:
+                unused.remove(p)
+
+        snakes.append(snake)
+
+    # If we exit the loop with unused empty, we filled everything
+    return snakes
+
+
+def generate_snakes_for_shape():
+    tiles, width, height = parse_shape(ASCII_SHAPE)
+
+    if RANDOM_SEED is not None:
+        random.seed(RANDOM_SEED)
+
+    for attempt in range(1, MAX_GLOBAL_ATTEMPTS + 1):
+        snakes = try_fill_once(tiles, MIN_SNAKE_LEN, MAX_SNAKE_LEN)
+        if snakes is not None:
+            print(f"Success in attempt {attempt} with {len(snakes)} snakes.")
+            return snakes
+
+    print("Failed to generate a full snake cover after many attempts.")
+    return None
+
+
+def snakes_to_json(snakes):
+    """
+    Convert list of snakes into your JSON format:
+    {
+      "shapes": [
+        {
+          "type": "Snake1",
+          "startPos": { "x": 0, "y": 0 },
+          "positions": [ { "x": x, "y": y }, ... ]
+        },
+        ...
+      ]
+    }
+    """
+    shapes = []
+    for i, snake in enumerate(snakes, start=1):
+        shape = {
+            "type": f"Snake{i}",
+            "startPos": {"x": 0, "y": 0},
+            "positions": [
+                {"x": int(x), "y": int(y)}
+                for (x, y) in snake
+            ]
+        }
+        shapes.append(shape)
+
+    return json.dumps({"shapes": shapes}, indent=2)
+
+
+def main():
+    snakes = generate_snakes_for_shape()
+    if snakes is None:
+        return
+
+    json_str = snakes_to_json(snakes)
+
+    print("\n=== JSON OUTPUT ===\n")
+    print(json_str)
+
+    # Also write to file
+    with open("snakeShapes.json", "w", encoding="utf-8") as f:
+        f.write(json_str)
+
+    print("\nSaved to snakeShapes.json")
+
+
+if __name__ == "__main__":
+    main()
