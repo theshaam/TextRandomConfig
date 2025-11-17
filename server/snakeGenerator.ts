@@ -222,31 +222,11 @@ export function generateSnakesForShape(
 
 /**
  * Convert snakes to JSON format
- * Each snake is normalized so positions are relative to the first position
  */
 export function snakesToJSON(snakes: Position[][]): SnakeShape[] {
-  return snakes.map((snake, i) => {
-    if (snake.length === 0) {
-      return {
-        type: `Snake${i + 1}`,
-        startPos: { x: 0, y: 0 },
-        positions: [],
-      };
-    }
-
-    // Get the first position as the reference point
-    const firstPos = snake[0];
-    
-    // Translate all positions so the first one is at (0, 0)
-    const normalizedPositions = snake.map(pos => ({
-      x: pos.x - firstPos.x,
-      y: pos.y - firstPos.y,
-    }));
-
-    return {
-      type: `Snake${i + 1}`,
-      startPos: { x: 0, y: 0 },
-      positions: normalizedPositions,
-    };
-  });
+  return snakes.map((snake, i) => ({
+    type: `Snake${i + 1}`,
+    startPos: { x: 0, y: 0 },
+    positions: snake,
+  }));
 }
