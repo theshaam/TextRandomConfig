@@ -170,7 +170,7 @@ function solveWithBacktracking(
       return true;
     }
     
-    // Find the best starting position (fewest neighbors first)
+    // Find the starting position with fewest neighbors (corners/edges first)
     const unusedArray = Array.from(unused);
     unusedArray.sort((a, b) => {
       const aNeighbors = countNeighbors(a, tiles);
@@ -178,39 +178,36 @@ function solveWithBacktracking(
       return aNeighbors - bNeighbors;
     });
     
-    // Try starting positions (prioritize corners/edges)
-    const maxStartTries = Math.min(5, unusedArray.length);
-    for (let i = 0; i < maxStartTries; i++) {
-      const startKey = unusedArray[i];
-      const start = parseKey(startKey);
+    // Always start from the most constrained position (fewest neighbors)
+    const startKey = unusedArray[0];
+    const start = parseKey(startKey);
+    
+    // Generate all possible snakes from this start position
+    const usedGlobal = new Set(tiles);
+    unused.forEach(key => usedGlobal.delete(key));
+    
+    const possibleSnakes = generateAllSnakes(start, tiles, usedGlobal, minLen, maxLen, rng);
+    
+    // Try each possible snake path
+    for (const snake of possibleSnakes) {
+      // Mark snake tiles as used
+      const snakeKeys = snake.map(pos => posKey(pos.x, pos.y));
+      const canPlace = snakeKeys.every(key => unused.has(key));
       
-      // Generate all possible snakes from this start position
-      const usedGlobal = new Set(tiles);
-      unused.forEach(key => usedGlobal.delete(key));
+      if (!canPlace) continue;
       
-      const possibleSnakes = generateAllSnakes(start, tiles, usedGlobal, minLen, maxLen, rng);
+      // Place the snake
+      snakeKeys.forEach(key => unused.delete(key));
+      snakes.push(snake);
       
-      // Try each possible snake path
-      for (const snake of possibleSnakes) {
-        // Mark snake tiles as used
-        const snakeKeys = snake.map(pos => posKey(pos.x, pos.y));
-        const canPlace = snakeKeys.every(key => unused.has(key));
-        
-        if (!canPlace) continue;
-        
-        // Place the snake
-        snakeKeys.forEach(key => unused.delete(key));
-        snakes.push(snake);
-        
-        // Recursively try to fill the rest
-        if (backtrack()) {
-          return true;
-        }
-        
-        // Backtrack: remove this snake and try another
-        snakes.pop();
-        snakeKeys.forEach(key => unused.add(key));
+      // Recursively try to fill the rest
+      if (backtrack()) {
+        return true;
       }
+      
+      // Backtrack: remove this snake and try another
+      snakes.pop();
+      snakeKeys.forEach(key => unused.add(key));
     }
     
     return false;

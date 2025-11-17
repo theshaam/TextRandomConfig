@@ -37,7 +37,7 @@ const SNAKE_COLORS = [
 
 export default function Home() {
   const [asciiShape, setAsciiShape] = useState(DEFAULT_SHAPE);
-  const [minSnakeLen, setMinSnakeLen] = useState(3);
+  const [minSnakeLen, setMinSnakeLen] = useState(1);
   const [maxSnakeLen, setMaxSnakeLen] = useState(7);
   const [randomSeed, setRandomSeed] = useState("");
   const [generatedShapes, setGeneratedShapes] = useState<SnakeShape[] | null>(null);
@@ -230,10 +230,10 @@ export default function Home() {
                 <Input
                   id="min-length"
                   type="number"
-                  min={3}
+                  min={1}
                   max={11}
                   value={minSnakeLen}
-                  onChange={(e) => setMinSnakeLen(parseInt(e.target.value) || 3)}
+                  onChange={(e) => setMinSnakeLen(parseInt(e.target.value) || 1)}
                   data-testid="input-min-length"
                 />
               </div>
@@ -245,7 +245,7 @@ export default function Home() {
                 <Input
                   id="max-length"
                   type="number"
-                  min={3}
+                  min={1}
                   max={11}
                   value={maxSnakeLen}
                   onChange={(e) => setMaxSnakeLen(parseInt(e.target.value) || 11)}
