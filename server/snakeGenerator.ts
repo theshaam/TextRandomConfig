@@ -226,7 +226,7 @@ export function generateSnakesForShape(
 export function snakesToJSON(snakes: Position[][]): SnakeShape[] {
   return snakes.map((snake, i) => ({
     type: `Snake${i + 1}`,
-    startPos: snake[0] || { x: 0, y: 0 }, // Use first position as head
+    startPos: { x: 0, y: 0 },
     positions: snake,
   }));
 }
