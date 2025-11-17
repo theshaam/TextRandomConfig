@@ -133,6 +133,15 @@ function buildSnake(
 }
 
 /**
+ * Count neighbors for a position to prioritize starting positions
+ * Positions with fewer neighbors (corners, edges) are harder to reach
+ */
+function countNeighbors(key: string, tiles: Set<string>): number {
+  const pos = parseKey(key);
+  return neighbors(pos, tiles).length;
+}
+
+/**
  * Attempt to cover all tiles with non-overlapping snakes in one pass
  */
 function tryFillOnce(
@@ -146,9 +155,20 @@ function tryFillOnce(
   const snakes: Position[][] = [];
 
   while (unused.size > 0) {
-    // Pick a random unused cell to start a new snake
+    // Prioritize starting from positions with fewer neighbors (corners/edges)
+    // This prevents getting stuck with isolated hard-to-reach tiles
     const unusedArray = Array.from(unused);
-    const randomIndex = Math.floor((rng ? rng.next() : Math.random()) * unusedArray.length);
+    
+    // Sort by neighbor count (ascending) so corners/edges come first
+    unusedArray.sort((a, b) => {
+      const aNeighbors = countNeighbors(a, tiles);
+      const bNeighbors = countNeighbors(b, tiles);
+      return aNeighbors - bNeighbors;
+    });
+    
+    // Pick from the first few positions (with fewest neighbors) to add some randomness
+    const topCandidates = Math.min(3, unusedArray.length);
+    const randomIndex = Math.floor((rng ? rng.next() : Math.random()) * topCandidates);
     const randomKey = unusedArray[randomIndex];
     const start = parseKey(randomKey);
 

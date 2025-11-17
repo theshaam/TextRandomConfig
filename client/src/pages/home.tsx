@@ -12,14 +12,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Download, CheckCircle2, AlertCircle, Copy } from "lucide-react";
 import type { GenerateSnakeResponse, SnakeShape } from "@shared/schema";
 
-const DEFAULT_SHAPE = `########
-########
-########
-########
-########
-########
-########
-########`;
+const DEFAULT_SHAPE = `   ######  ######
+ ######## ########
+ ###################
+  #################
+    #############
+      #########
+        #######
+          ###
+           #`;
 
 const SNAKE_COLORS = [
   "#3B82F6", // Blue
@@ -37,7 +38,7 @@ const SNAKE_COLORS = [
 export default function Home() {
   const [asciiShape, setAsciiShape] = useState(DEFAULT_SHAPE);
   const [minSnakeLen, setMinSnakeLen] = useState(3);
-  const [maxSnakeLen, setMaxSnakeLen] = useState(11);
+  const [maxSnakeLen, setMaxSnakeLen] = useState(7);
   const [randomSeed, setRandomSeed] = useState("");
   const [generatedShapes, setGeneratedShapes] = useState<SnakeShape[] | null>(null);
   const [attempts, setAttempts] = useState<number | null>(null);
