@@ -88,48 +88,52 @@ function shuffle<T>(array: T[], rng?: SeededRandom): void {
 }
 
 /**
- * Try to build a single snake starting from `start`
+ * Generate all possible snake paths from a start position
  */
-function buildSnake(
+function generateAllSnakes(
   start: Position,
   tiles: Set<string>,
   usedGlobal: Set<string>,
   minLen: number,
   maxLen: number,
   rng?: SeededRandom
-): Position[] | null {
-  const path: Position[] = [start];
-  const usedLocal = new Set<string>([posKey(start.x, start.y)]);
-
-  for (let i = 0; i < maxLen - 1; i++) {
-    const current = path[path.length - 1];
+): Position[][] {
+  const results: Position[][] = [];
+  
+  function buildPath(path: Position[], usedLocal: Set<string>) {
+    if (path.length >= minLen && path.length <= maxLen) {
+      results.push([...path]);
+    }
     
-    // Get candidate neighbors: in shape, not used globally, not used in this snake
+    if (path.length >= maxLen) {
+      return;
+    }
+    
+    const current = path[path.length - 1];
     const allNeighbors = neighbors(current, tiles);
     const candidates = allNeighbors.filter(n => {
       const key = posKey(n.x, n.y);
       return !usedGlobal.has(key) && !usedLocal.has(key);
     });
-
-    if (candidates.length === 0) {
-      break;
-    }
-
+    
     shuffle(candidates, rng);
-    const chosen = candidates[0];
-
-    path.push(chosen);
-    usedLocal.add(posKey(chosen.x, chosen.y));
-
-    if (path.length >= maxLen) {
-      break;
+    
+    for (const next of candidates) {
+      const key = posKey(next.x, next.y);
+      path.push(next);
+      usedLocal.add(key);
+      
+      buildPath(path, usedLocal);
+      
+      path.pop();
+      usedLocal.delete(key);
     }
   }
-
-  if (path.length >= minLen) {
-    return path;
-  }
-  return null;
+  
+  const startKey = posKey(start.x, start.y);
+  buildPath([start], new Set([startKey]));
+  
+  return results;
 }
 
 /**
@@ -142,76 +146,101 @@ function countNeighbors(key: string, tiles: Set<string>): number {
 }
 
 /**
- * Attempt to cover all tiles with non-overlapping snakes in one pass
+ * Backtracking solver to cover all tiles with non-overlapping snakes
  */
-function tryFillOnce(
+function solveWithBacktracking(
   tiles: Set<string>,
   minLen: number,
   maxLen: number,
-  rng?: SeededRandom
+  rng?: SeededRandom,
+  maxIterations: number = 100000
 ): Position[][] | null {
   const unused = new Set(tiles);
-  const usedGlobal = new Set<string>();
   const snakes: Position[][] = [];
-
-  while (unused.size > 0) {
-    // Prioritize starting from positions with fewer neighbors (corners/edges)
-    // This prevents getting stuck with isolated hard-to-reach tiles
-    const unusedArray = Array.from(unused);
+  let iterations = 0;
+  
+  function backtrack(): boolean {
+    iterations++;
+    if (iterations > maxIterations) {
+      return false; // Timeout to prevent infinite loops
+    }
     
-    // Sort by neighbor count (ascending) so corners/edges come first
+    // Base case: all tiles are used
+    if (unused.size === 0) {
+      return true;
+    }
+    
+    // Find the best starting position (fewest neighbors first)
+    const unusedArray = Array.from(unused);
     unusedArray.sort((a, b) => {
       const aNeighbors = countNeighbors(a, tiles);
       const bNeighbors = countNeighbors(b, tiles);
       return aNeighbors - bNeighbors;
     });
     
-    // Pick from the first few positions (with fewest neighbors) to add some randomness
-    const topCandidates = Math.min(3, unusedArray.length);
-    const randomIndex = Math.floor((rng ? rng.next() : Math.random()) * topCandidates);
-    const randomKey = unusedArray[randomIndex];
-    const start = parseKey(randomKey);
-
-    const snake = buildSnake(start, tiles, usedGlobal, minLen, maxLen, rng);
-    if (snake === null) {
-      // Could not grow a valid snake from this starting layout
-      return null;
-    }
-
-    // Reserve its cells globally
-    for (const pos of snake) {
-      const key = posKey(pos.x, pos.y);
-      if (usedGlobal.has(key)) {
-        // Overlap case → invalid
-        return null;
+    // Try starting positions (prioritize corners/edges)
+    const maxStartTries = Math.min(5, unusedArray.length);
+    for (let i = 0; i < maxStartTries; i++) {
+      const startKey = unusedArray[i];
+      const start = parseKey(startKey);
+      
+      // Generate all possible snakes from this start position
+      const usedGlobal = new Set(tiles);
+      unused.forEach(key => usedGlobal.delete(key));
+      
+      const possibleSnakes = generateAllSnakes(start, tiles, usedGlobal, minLen, maxLen, rng);
+      
+      // Try each possible snake path
+      for (const snake of possibleSnakes) {
+        // Mark snake tiles as used
+        const snakeKeys = snake.map(pos => posKey(pos.x, pos.y));
+        const canPlace = snakeKeys.every(key => unused.has(key));
+        
+        if (!canPlace) continue;
+        
+        // Place the snake
+        snakeKeys.forEach(key => unused.delete(key));
+        snakes.push(snake);
+        
+        // Recursively try to fill the rest
+        if (backtrack()) {
+          return true;
+        }
+        
+        // Backtrack: remove this snake and try another
+        snakes.pop();
+        snakeKeys.forEach(key => unused.add(key));
       }
-      usedGlobal.add(key);
-      unused.delete(key);
     }
-
-    snakes.push(snake);
+    
+    return false;
   }
-
-  return snakes;
+  
+  if (backtrack()) {
+    return snakes;
+  }
+  
+  return null;
 }
 
 /**
- * Generate snakes for a shape with retry logic
+ * Generate snakes for a shape using backtracking algorithm
  */
 export function generateSnakesForShape(
   asciiShape: string,
   minSnakeLen: number,
   maxSnakeLen: number,
   randomSeed?: number,
-  maxAttempts: number = 10000
+  maxAttempts: number = 10
 ): { snakes: Position[][] | null; attempts: number } {
   const { tiles } = parseShape(asciiShape);
 
   // Create request-scoped random number generator if seed provided
   const rng = randomSeed !== undefined ? new SeededRandom(randomSeed) : undefined;
 
+  // Try backtracking multiple times with different random choices
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const snakes = tryFillOnce(tiles, minSnakeLen, maxSnakeLen, rng);
+    const snakes = solveWithBacktracking(tiles, minSnakeLen, maxSnakeLen, rng, 100000);
     if (snakes !== null) {
       return { snakes, attempts: attempt };
     }
