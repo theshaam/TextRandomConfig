@@ -154,6 +154,46 @@ export default function Home() {
       ctx.stroke();
     }
 
+    // Helper function to draw directional arrow
+    const drawArrow = (centerX: number, centerY: number, direction: string | null) => {
+      if (!direction) return;
+      
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      
+      const arrowSize = 7;
+      
+      switch (direction) {
+        case "up":
+          // Triangle pointing up
+          ctx.moveTo(centerX, centerY - arrowSize);
+          ctx.lineTo(centerX - arrowSize, centerY + arrowSize);
+          ctx.lineTo(centerX + arrowSize, centerY + arrowSize);
+          break;
+        case "down":
+          // Triangle pointing down
+          ctx.moveTo(centerX, centerY + arrowSize);
+          ctx.lineTo(centerX - arrowSize, centerY - arrowSize);
+          ctx.lineTo(centerX + arrowSize, centerY - arrowSize);
+          break;
+        case "left":
+          // Triangle pointing left
+          ctx.moveTo(centerX - arrowSize, centerY);
+          ctx.lineTo(centerX + arrowSize, centerY - arrowSize);
+          ctx.lineTo(centerX + arrowSize, centerY + arrowSize);
+          break;
+        case "right":
+          // Triangle pointing right
+          ctx.moveTo(centerX + arrowSize, centerY);
+          ctx.lineTo(centerX - arrowSize, centerY - arrowSize);
+          ctx.lineTo(centerX - arrowSize, centerY + arrowSize);
+          break;
+      }
+      
+      ctx.closePath();
+      ctx.fill();
+    };
+
     // Draw snakes
     generatedShapes.forEach((snake, snakeIndex) => {
       const color = SNAKE_COLORS[snakeIndex % SNAKE_COLORS.length];
@@ -166,12 +206,9 @@ export default function Home() {
         ctx.fillStyle = color;
         ctx.fillRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
         
-        // Draw head indicator (first position)
+        // Draw directional arrow on head (first position)
         if (index === 0) {
-          ctx.fillStyle = "#ffffff";
-          ctx.beginPath();
-          ctx.arc(x + cellSize / 2, y + cellSize / 2, 4, 0, Math.PI * 2);
-          ctx.fill();
+          drawArrow(x + cellSize / 2, y + cellSize / 2, snake.direction);
         }
       });
     });
