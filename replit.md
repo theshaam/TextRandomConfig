@@ -14,6 +14,14 @@ This tool allows users to:
 
 ## Recent Changes
 
+**November 18, 2025**
+- Changed minimum snake length from 3 to 1 (supports single-cell snakes)
+- Implemented backtracking algorithm for reliable complex shape generation
+- Added direction parameter to each snake (up/down/left/right or null for single-cell)
+- Added constraint: snake heads on same row/column cannot face each other directly
+- Direction is calculated from first two positions and included in JSON output
+- Single-cell snakes (direction: null) bypass the facing constraint
+
 **November 17, 2025**
 - Implemented complete snake puzzle generator MVP
 - Created beautiful two-panel interface following design guidelines
@@ -21,8 +29,6 @@ This tool allows users to:
 - Added request-scoped seeded random number generation
 - Implemented JSON output viewer with copy functionality
 - Added comprehensive error handling and loading states
-- Increased max generation attempts to 10,000 for better success rate
-- Changed default shape to reliable 8x8 grid
 - All end-to-end tests passing
 
 ## User Preferences
@@ -44,9 +50,11 @@ This tool allows users to:
 ### Backend (`server/`)
 - **routes.ts** - API endpoint for snake generation (`POST /api/generate`)
 - **snakeGenerator.ts** - Core algorithm for filling shapes with snakes
+  - Backtracking algorithm with most-constrained-variable-first heuristic
   - Request-scoped SeededRandom for deterministic generation
-  - Retry logic with up to 10,000 attempts
-  - Correct snake head position tracking
+  - Direction calculation and face-to-face constraint enforcement
+  - 100,000 iteration limit to prevent runaway searches
+  - Retry logic with up to 10 attempts
 - **storage.ts** - Storage interface (currently unused, ready for future features)
 
 ### Shared (`shared/`)
@@ -56,11 +64,15 @@ This tool allows users to:
 
 ### Snake Generation Algorithm
 1. Parse ASCII shape into grid of tiles
-2. Randomly select starting position for each snake
-3. Grow snakes along 4-directional neighbors
-4. Ensure no overlapping between snakes
-5. Retry if unable to fill entire shape
-6. Return JSON with snake positions
+2. Use backtracking to place snakes:
+   - Always start from most constrained position (fewest neighbors)
+   - Generate all possible snake paths from start position
+   - Calculate direction from first two positions (up/down/left/right)
+   - Check direction constraint: reject if snake would face an existing snake on same row/column
+   - Place snake and recurse to fill remaining tiles
+   - Backtrack if no valid placement exists
+3. Single-cell snakes have direction: null and bypass facing constraint
+4. Return JSON with snake positions and directions
 
 ### API Contract
 
@@ -69,17 +81,25 @@ This tool allows users to:
 // Request
 {
   asciiShape: string;      // ASCII art with '#' for cells
-  minSnakeLen: number;     // 3-11
-  maxSnakeLen: number;     // 3-11
+  minSnakeLen: number;     // 1-11 (now supports single-cell snakes)
+  maxSnakeLen: number;     // 1-11
   randomSeed?: number;     // Optional for deterministic results
 }
 
 // Response
 {
   success: boolean;
-  shapes?: SnakeShape[];   // Array of snakes with positions
+  shapes?: SnakeShape[];   // Array of snakes with positions and directions
   attempts?: number;       // How many tries needed
   error?: string;          // Error message if failed
+}
+
+// SnakeShape
+{
+  type: string;            // e.g., "Snake1"
+  startPos: Position;      // Always {x: 0, y: 0} (normalized)
+  direction: Direction | null; // "up"|"down"|"left"|"right" or null for single-cell
+  positions: Position[];   // Array of {x, y} coordinates
 }
 ```
 
@@ -92,9 +112,11 @@ This tool allows users to:
 
 ## Known Limitations
 
-- Complex shapes (e.g., heart, intricate patterns) may fail to generate if no valid snake tiling exists
-- Algorithm uses greedy random search, not guaranteed to find solution for all shapes
-- Default 8x8 grid and simple rectangular shapes work reliably
+- Direction constraint may prevent generation of certain configurations:
+  - Example: A single row with strictly 2-cell snakes will fail (they'd face each other)
+  - Solution: Allow single-cell snakes (min=1) or increase max length for flexibility
+- Backtracking algorithm is exhaustive but capped at 100,000 iterations
+- Some valid tilings may not be found if search space is too large
 - Users can adjust parameters or simplify shapes if generation fails
 
 ## Future Enhancements
