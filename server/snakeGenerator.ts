@@ -237,7 +237,7 @@ function solveWithGreedy(
     // Try to generate a snake a few times
     let snake: Position[] | null = null;
     let attempts2 = 0;
-    const maxSnakeAttempts = 10;
+    const maxSnakeAttempts = 30;
     
     while (attempts2 < maxSnakeAttempts && !snake) {
       attempts2++;
@@ -292,16 +292,20 @@ export function generateSnakesForShape(
   minSnakeLen: number,
   maxSnakeLen: number,
   randomSeed?: number,
-  maxAttempts: number = 20
+  maxAttempts: number = 100
 ): { snakes: Position[][] | null; attempts: number } {
   const { tiles } = parseShape(asciiShape);
 
   // Create request-scoped random number generator if seed provided
   const rng = randomSeed !== undefined ? new SeededRandom(randomSeed) : undefined;
 
+  // Scale attempts based on shape complexity
+  const tileCount = tiles.size;
+  const innerAttempts = Math.min(500, Math.max(100, tileCount * 2));
+
   // Try greedy algorithm multiple times with different random choices
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const snakes = solveWithGreedy(tiles, minSnakeLen, maxSnakeLen, rng, 100);
+    const snakes = solveWithGreedy(tiles, minSnakeLen, maxSnakeLen, rng, innerAttempts);
     if (snakes !== null) {
       return { snakes, attempts: attempt };
     }
