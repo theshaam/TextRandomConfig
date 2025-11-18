@@ -37,8 +37,8 @@ const SNAKE_COLORS = [
 
 export default function Home() {
   const [asciiShape, setAsciiShape] = useState(DEFAULT_SHAPE);
-  const [minSnakeLen, setMinSnakeLen] = useState(1);
-  const [maxSnakeLen, setMaxSnakeLen] = useState(7);
+  const [minSnakeLen, setMinSnakeLen] = useState(2);
+  const [maxSnakeLen, setMaxSnakeLen] = useState(13);
   const [randomSeed, setRandomSeed] = useState("");
   const [generatedShapes, setGeneratedShapes] = useState<SnakeShape[] | null>(null);
   const [attempts, setAttempts] = useState<number | null>(null);
@@ -267,12 +267,13 @@ export default function Home() {
                 <Input
                   id="min-length"
                   type="number"
-                  min={1}
-                  max={11}
+                  min={2}
+                  max={13}
                   value={minSnakeLen}
-                  onChange={(e) => setMinSnakeLen(parseInt(e.target.value) || 1)}
+                  onChange={(e) => setMinSnakeLen(Math.max(2, parseInt(e.target.value) || 2))}
                   data-testid="input-min-length"
                 />
+                <p className="text-xs text-muted-foreground">Must be at least 2</p>
               </div>
 
               <div className="space-y-2">
@@ -282,12 +283,13 @@ export default function Home() {
                 <Input
                   id="max-length"
                   type="number"
-                  min={1}
-                  max={11}
+                  min={2}
+                  max={13}
                   value={maxSnakeLen}
-                  onChange={(e) => setMaxSnakeLen(parseInt(e.target.value) || 11)}
+                  onChange={(e) => setMaxSnakeLen(Math.min(13, Math.max(2, parseInt(e.target.value) || 13)))}
                   data-testid="input-max-length"
                 />
+                <p className="text-xs text-muted-foreground">Maximum is 13</p>
               </div>
 
               <div className="space-y-2">

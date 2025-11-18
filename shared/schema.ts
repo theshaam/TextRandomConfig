@@ -3,8 +3,8 @@ import { z } from "zod";
 // Snake generation schemas
 export const generateSnakeSchema = z.object({
   asciiShape: z.string().min(1, "Shape input is required"),
-  minSnakeLen: z.number().int().min(1).max(11),
-  maxSnakeLen: z.number().int().min(1).max(11),
+  minSnakeLen: z.number().int().min(2, "Minimum snake length must be at least 2").max(13),
+  maxSnakeLen: z.number().int().min(2).max(13, "Maximum snake length cannot exceed 13"),
   randomSeed: z.number().int().optional(),
 }).refine(data => data.minSnakeLen <= data.maxSnakeLen, {
   message: "Minimum snake length must be less than or equal to maximum",
