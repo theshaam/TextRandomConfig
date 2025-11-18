@@ -89,6 +89,7 @@ function shuffle<T>(array: T[], rng?: SeededRandom): void {
 
 /**
  * Get direction of a snake based on its first two positions
+ * Direction points AWAY from the tail (where the snake is "looking")
  * Returns null for single-cell snakes (no direction)
  */
 function getSnakeDirection(snake: Position[]): Direction | null {
@@ -97,12 +98,14 @@ function getSnakeDirection(snake: Position[]): Direction | null {
   }
   
   const head = snake[0];
-  const next = snake[1];
+  const next = snake[1]; // First body segment
   
-  if (next.x > head.x) return "right";
-  if (next.x < head.x) return "left";
-  if (next.y > head.y) return "down";
-  return "up";
+  // Direction is OPPOSITE of where the body is
+  // If body is to the right, snake faces left (away from body)
+  if (next.x > head.x) return "left";
+  if (next.x < head.x) return "right";
+  if (next.y > head.y) return "up";
+  return "down";
 }
 
 /**
