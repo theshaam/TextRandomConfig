@@ -28,6 +28,7 @@ export const snakeShapeSchema = z.object({
   type: z.string(),
   startPos: positionSchema,
   direction: directionSchema.nullable(),
+  lookingAt: positionSchema.nullable(),
   positions: z.array(positionSchema),
 });
 

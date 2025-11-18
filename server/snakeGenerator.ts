@@ -325,13 +325,48 @@ export function generateSnakesForShape(
 }
 
 /**
+ * Calculate the position the snake is looking at based on head and direction
+ */
+function getLookingAtPosition(head: Position, direction: Direction | null): Position | null {
+  if (direction === null) {
+    return null;
+  }
+  
+  const lookingAt = { ...head };
+  
+  switch (direction) {
+    case "up":
+      lookingAt.y -= 1;
+      break;
+    case "down":
+      lookingAt.y += 1;
+      break;
+    case "left":
+      lookingAt.x -= 1;
+      break;
+    case "right":
+      lookingAt.x += 1;
+      break;
+  }
+  
+  return lookingAt;
+}
+
+/**
  * Convert snakes to JSON format
  */
 export function snakesToJSON(snakes: Position[][]): SnakeShape[] {
-  return snakes.map((snake, i) => ({
-    type: `Snake${i + 1}`,
-    startPos: { x: 0, y: 0 },
-    direction: getSnakeDirection(snake),
-    positions: snake,
-  }));
+  return snakes.map((snake, i) => {
+    const direction = getSnakeDirection(snake);
+    const head = snake[0];
+    const lookingAt = getLookingAtPosition(head, direction);
+    
+    return {
+      type: `Snake${i + 1}`,
+      startPos: { x: 0, y: 0 },
+      direction,
+      lookingAt,
+      positions: snake,
+    };
+  });
 }
