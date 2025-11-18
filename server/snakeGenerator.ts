@@ -149,27 +149,24 @@ function snakesFaceEachOther(
 }
 
 /**
- * Generate all possible snake paths from a start position
+ * Generate a single greedy snake path (much faster than generating all possibilities)
+ * Tries to create snakes of varying lengths randomly
  */
-function generateAllSnakes(
+function generateGreedySnake(
   start: Position,
   tiles: Set<string>,
   usedGlobal: Set<string>,
   minLen: number,
   maxLen: number,
   rng?: SeededRandom
-): Position[][] {
-  const results: Position[][] = [];
+): Position[] | null {
+  const path: Position[] = [start];
+  const usedLocal = new Set([posKey(start.x, start.y)]);
   
-  function buildPath(path: Position[], usedLocal: Set<string>) {
-    if (path.length >= minLen && path.length <= maxLen) {
-      results.push([...path]);
-    }
-    
-    if (path.length >= maxLen) {
-      return;
-    }
-    
+  // Randomly decide target length for this snake
+  const targetLen = minLen + Math.floor((rng ? rng.next() : Math.random()) * (maxLen - minLen + 1));
+  
+  while (path.length < targetLen) {
     const current = path[path.length - 1];
     const allNeighbors = neighbors(current, tiles);
     const candidates = allNeighbors.filter(n => {
@@ -177,24 +174,20 @@ function generateAllSnakes(
       return !usedGlobal.has(key) && !usedLocal.has(key);
     });
     
-    shuffle(candidates, rng);
-    
-    for (const next of candidates) {
-      const key = posKey(next.x, next.y);
-      path.push(next);
-      usedLocal.add(key);
-      
-      buildPath(path, usedLocal);
-      
-      path.pop();
-      usedLocal.delete(key);
+    if (candidates.length === 0) {
+      break; // Can't extend further
     }
+    
+    // Pick a random neighbor
+    const randomIndex = Math.floor((rng ? rng.next() : Math.random()) * candidates.length);
+    const next = candidates[randomIndex];
+    
+    path.push(next);
+    usedLocal.add(posKey(next.x, next.y));
   }
   
-  const startKey = posKey(start.x, start.y);
-  buildPath([start], new Set([startKey]));
-  
-  return results;
+  // Return the snake if it meets minimum length
+  return path.length >= minLen ? path : null;
 }
 
 /**
@@ -207,31 +200,23 @@ function countNeighbors(key: string, tiles: Set<string>): number {
 }
 
 /**
- * Backtracking solver to cover all tiles with non-overlapping snakes
- * Now with direction constraint: snakes on same row/column can't face each other
+ * Optimized greedy solver - much faster than full backtracking
+ * Uses a greedy approach with limited retries instead of exploring all possibilities
  */
-function solveWithBacktracking(
+function solveWithGreedy(
   tiles: Set<string>,
   minLen: number,
   maxLen: number,
   rng?: SeededRandom,
-  maxIterations: number = 100000
+  maxAttempts: number = 50
 ): Position[][] | null {
   const unused = new Set(tiles);
   const snakes: Position[][] = [];
   const directions: (Direction | null)[] = [];
-  let iterations = 0;
+  let attempts = 0;
   
-  function backtrack(): boolean {
-    iterations++;
-    if (iterations > maxIterations) {
-      return false; // Timeout to prevent infinite loops
-    }
-    
-    // Base case: all tiles are used
-    if (unused.size === 0) {
-      return true;
-    }
+  while (unused.size > 0 && attempts < maxAttempts) {
+    attempts++;
     
     // Find the starting position with fewest neighbors (corners/edges first)
     const unusedArray = Array.from(unused);
@@ -245,77 +230,78 @@ function solveWithBacktracking(
     const startKey = unusedArray[0];
     const start = parseKey(startKey);
     
-    // Generate all possible snakes from this start position
+    // Build used global set
     const usedGlobal = new Set(tiles);
     unused.forEach(key => usedGlobal.delete(key));
     
-    const possibleSnakes = generateAllSnakes(start, tiles, usedGlobal, minLen, maxLen, rng);
+    // Try to generate a snake a few times
+    let snake: Position[] | null = null;
+    let attempts2 = 0;
+    const maxSnakeAttempts = 10;
     
-    // Try each possible snake path
-    for (const snake of possibleSnakes) {
-      // Mark snake tiles as used
-      const snakeKeys = snake.map(pos => posKey(pos.x, pos.y));
-      const canPlace = snakeKeys.every(key => unused.has(key));
+    while (attempts2 < maxSnakeAttempts && !snake) {
+      attempts2++;
+      const candidate = generateGreedySnake(start, tiles, usedGlobal, minLen, maxLen, rng);
       
-      if (!canPlace) continue;
+      if (!candidate) continue;
       
       // Check direction constraint
-      const newDirection = getSnakeDirection(snake);
+      const newDirection = getSnakeDirection(candidate);
       let violatesDirection = false;
       
       for (let i = 0; i < snakes.length; i++) {
-        if (snakesFaceEachOther(snake, newDirection, snakes[i], directions[i])) {
+        if (snakesFaceEachOther(candidate, newDirection, snakes[i], directions[i])) {
           violatesDirection = true;
           break;
         }
       }
       
-      if (violatesDirection) continue;
-      
-      // Place the snake
-      snakeKeys.forEach(key => unused.delete(key));
-      snakes.push(snake);
-      directions.push(newDirection);
-      
-      // Recursively try to fill the rest
-      if (backtrack()) {
-        return true;
+      if (!violatesDirection) {
+        snake = candidate;
       }
-      
-      // Backtrack: remove this snake and try another
-      snakes.pop();
-      directions.pop();
-      snakeKeys.forEach(key => unused.add(key));
     }
     
-    return false;
+    if (!snake) {
+      // Can't place a valid snake, backtrack last snake if we have any
+      if (snakes.length > 0) {
+        const lastSnake = snakes.pop()!;
+        directions.pop();
+        lastSnake.forEach(pos => unused.add(posKey(pos.x, pos.y)));
+      } else {
+        return null; // Failed to find solution
+      }
+      continue;
+    }
+    
+    // Place the snake
+    const snakeKeys = snake.map(pos => posKey(pos.x, pos.y));
+    snakeKeys.forEach(key => unused.delete(key));
+    snakes.push(snake);
+    directions.push(getSnakeDirection(snake));
   }
   
-  if (backtrack()) {
-    return snakes;
-  }
-  
-  return null;
+  // Success if all tiles are used
+  return unused.size === 0 ? snakes : null;
 }
 
 /**
- * Generate snakes for a shape using backtracking algorithm
+ * Generate snakes for a shape using optimized greedy algorithm
  */
 export function generateSnakesForShape(
   asciiShape: string,
   minSnakeLen: number,
   maxSnakeLen: number,
   randomSeed?: number,
-  maxAttempts: number = 10
+  maxAttempts: number = 20
 ): { snakes: Position[][] | null; attempts: number } {
   const { tiles } = parseShape(asciiShape);
 
   // Create request-scoped random number generator if seed provided
   const rng = randomSeed !== undefined ? new SeededRandom(randomSeed) : undefined;
 
-  // Try backtracking multiple times with different random choices
+  // Try greedy algorithm multiple times with different random choices
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const snakes = solveWithBacktracking(tiles, minSnakeLen, maxSnakeLen, rng, 100000);
+    const snakes = solveWithGreedy(tiles, minSnakeLen, maxSnakeLen, rng, 100);
     if (snakes !== null) {
       return { snakes, attempts: attempt };
     }
