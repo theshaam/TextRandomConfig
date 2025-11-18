@@ -20,9 +20,14 @@ export const positionSchema = z.object({
 
 export type Position = z.infer<typeof positionSchema>;
 
+export const directionSchema = z.enum(["up", "down", "left", "right"]);
+
+export type Direction = z.infer<typeof directionSchema>;
+
 export const snakeShapeSchema = z.object({
   type: z.string(),
   startPos: positionSchema,
+  direction: directionSchema.nullable(),
   positions: z.array(positionSchema),
 });
 

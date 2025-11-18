@@ -1,4 +1,4 @@
-import type { SnakeShape, Position } from "@shared/schema";
+import type { SnakeShape, Position, Direction } from "@shared/schema";
 
 interface Tile {
   x: number;
@@ -88,6 +88,64 @@ function shuffle<T>(array: T[], rng?: SeededRandom): void {
 }
 
 /**
+ * Get direction of a snake based on its first two positions
+ * Returns null for single-cell snakes (no direction)
+ */
+function getSnakeDirection(snake: Position[]): Direction | null {
+  if (snake.length < 2) {
+    return null; // Single-cell snakes have no direction
+  }
+  
+  const head = snake[0];
+  const next = snake[1];
+  
+  if (next.x > head.x) return "right";
+  if (next.x < head.x) return "left";
+  if (next.y > head.y) return "down";
+  return "up";
+}
+
+/**
+ * Check if two snakes face each other on the same row or column
+ * Returns false if either snake is single-cell (no direction)
+ */
+function snakesFaceEachOther(
+  snake1: Position[],
+  dir1: Direction | null,
+  snake2: Position[],
+  dir2: Direction | null
+): boolean {
+  // Skip check if either snake has no direction (single-cell)
+  if (snake1.length === 0 || snake2.length === 0) return false;
+  if (dir1 === null || dir2 === null) return false;
+  
+  const head1 = snake1[0];
+  const head2 = snake2[0];
+  
+  // Check same row
+  if (head1.y === head2.y) {
+    // One facing left, one facing right
+    if ((dir1 === "left" && dir2 === "right") || (dir1 === "right" && dir2 === "left")) {
+      // Check if they're actually facing each other (not back-to-back)
+      if (dir1 === "left" && head1.x > head2.x) return true;
+      if (dir1 === "right" && head1.x < head2.x) return true;
+    }
+  }
+  
+  // Check same column
+  if (head1.x === head2.x) {
+    // One facing up, one facing down
+    if ((dir1 === "up" && dir2 === "down") || (dir1 === "down" && dir2 === "up")) {
+      // Check if they're actually facing each other (not back-to-back)
+      if (dir1 === "up" && head1.y > head2.y) return true;
+      if (dir1 === "down" && head1.y < head2.y) return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
  * Generate all possible snake paths from a start position
  */
 function generateAllSnakes(
@@ -147,6 +205,7 @@ function countNeighbors(key: string, tiles: Set<string>): number {
 
 /**
  * Backtracking solver to cover all tiles with non-overlapping snakes
+ * Now with direction constraint: snakes on same row/column can't face each other
  */
 function solveWithBacktracking(
   tiles: Set<string>,
@@ -157,6 +216,7 @@ function solveWithBacktracking(
 ): Position[][] | null {
   const unused = new Set(tiles);
   const snakes: Position[][] = [];
+  const directions: (Direction | null)[] = [];
   let iterations = 0;
   
   function backtrack(): boolean {
@@ -196,9 +256,23 @@ function solveWithBacktracking(
       
       if (!canPlace) continue;
       
+      // Check direction constraint
+      const newDirection = getSnakeDirection(snake);
+      let violatesDirection = false;
+      
+      for (let i = 0; i < snakes.length; i++) {
+        if (snakesFaceEachOther(snake, newDirection, snakes[i], directions[i])) {
+          violatesDirection = true;
+          break;
+        }
+      }
+      
+      if (violatesDirection) continue;
+      
       // Place the snake
       snakeKeys.forEach(key => unused.delete(key));
       snakes.push(snake);
+      directions.push(newDirection);
       
       // Recursively try to fill the rest
       if (backtrack()) {
@@ -207,6 +281,7 @@ function solveWithBacktracking(
       
       // Backtrack: remove this snake and try another
       snakes.pop();
+      directions.pop();
       snakeKeys.forEach(key => unused.add(key));
     }
     
@@ -253,6 +328,7 @@ export function snakesToJSON(snakes: Position[][]): SnakeShape[] {
   return snakes.map((snake, i) => ({
     type: `Snake${i + 1}`,
     startPos: { x: 0, y: 0 },
+    direction: getSnakeDirection(snake),
     positions: snake,
   }));
 }
